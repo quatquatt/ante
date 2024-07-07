@@ -165,6 +165,13 @@ pub fn node_at_index<'a>(ast: &'a Ast<'a>, idx: usize) -> &'a Ast<'a> {
             Ast::Variable(_) => {
                 break;
             },
+            Ast::Borrow(borrow) => {
+                if borrow.rhs.locate().contains_index(&idx) {
+                    ast = &borrow.rhs;
+                } else {
+                    break;
+                }
+            },
         }
     }
     ast

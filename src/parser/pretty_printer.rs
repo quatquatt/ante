@@ -7,6 +7,8 @@ use std::fmt::{self, Display, Formatter};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
+use super::ast::Mutability;
+
 static INDENT_LEVEL: AtomicUsize = AtomicUsize::new(0);
 
 impl<'a> Display for Ast<'a> {
@@ -289,5 +291,15 @@ impl<'a> Display for ast::NamedConstructor<'a> {
         });
 
         write!(f, "({} with {})", self.constructor, args.join(", "))
+    }
+}
+
+impl<'a> Display for ast::Borrow<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if self.mutability == Mutability::Mutable {
+            write!(f, "(&mut {})", self.rhs)
+        } else {
+            write!(f, "&{}", self.rhs)
+        }
     }
 }

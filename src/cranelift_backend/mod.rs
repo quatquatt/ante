@@ -233,3 +233,24 @@ impl CodeGen for hir::Builtin {
         builtin::call_builtin(self, context, builder)
     }
 }
+
+impl CodeGen for hir::Borrow {
+    fn codegen<'a>(&'a self, context: &mut Context<'a>, builder: &mut FunctionBuilder) -> Value {
+        match self.rhs.codegen(context, builder) {
+            Value::Loadable(address, types) => {
+                if types.len() == 1 {
+                    Value::Normal(address)
+                } else {
+                    let mut offset = 0;
+                    let address_type = builder.func.dfg.value_type(address);
+                    Value::Tuple(fmap(types, |typ| {
+                        let offset_value = builder.ins().iconst(address_type, offset as i64);
+                        offset += typ.bytes();
+                        Value::Normal(builder.ins().iadd(address, offset_value))
+                    }))
+                }
+            },
+            other => other,
+        }
+    }
+}

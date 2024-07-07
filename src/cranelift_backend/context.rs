@@ -68,7 +68,7 @@ pub enum Value {
 
     /// A loadable is a pointer value that should be loaded before it is used.
     /// Mutable definitions usually translate to these.
-    Loadable(CraneliftValue, cranelift_types::Type),
+    Loadable(CraneliftValue, Vec<cranelift_types::Type>),
 
     /// Lazily inserting unit values helps prevent cluttering the IR with too many
     /// unit literals.
@@ -90,6 +90,14 @@ impl Value {
                 }
                 result
             },
+            Value::Loadable(ptr, types) => {
+                let mut offset = 0;
+                fmap(types, |typ| {
+                    let value = builder.ins().load(typ, MemFlags::new(), ptr, offset as i32);
+                    offset += typ.bytes();
+                    value
+                })
+            }
             other => vec![other.eval_single(context, builder)],
         }
     }
@@ -98,7 +106,10 @@ impl Value {
     pub fn eval_single(self, context: &mut Context, builder: &mut FunctionBuilder) -> CraneliftValue {
         match self {
             Value::Normal(value) => value,
-            Value::Loadable(ptr, typ) => builder.ins().load(typ, MemFlags::new(), ptr, 0),
+            Value::Loadable(ptr, types) => {
+                assert_eq!(types.len(), 1, "eval_single called on a tuple value");
+                builder.ins().load(types[0], MemFlags::new(), ptr, 0)
+            }
             Value::Unit => {
                 let unit_type = cranelift_types::I8;
                 builder.ins().iconst(unit_type, 0)
@@ -276,8 +287,9 @@ impl<'local> Context<'local> {
         match value {
             Value::Function(data) => FunctionValue::Direct(data),
             Value::Normal(value) => FunctionValue::Indirect(value),
-            Value::Loadable(ptr, typ) => {
-                let value = builder.ins().load(typ, MemFlags::new(), ptr, 0);
+            Value::Loadable(ptr, types) => {
+                assert_eq!(types.len(), 1, "codegen_function_use called on tuple value");
+                let value = builder.ins().load(types[0], MemFlags::new(), ptr, 0);
                 FunctionValue::Indirect(value)
             },
             Value::Global(_) => {

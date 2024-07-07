@@ -121,6 +121,10 @@ fn replace_env(expr: Ast, env: &Ast, definition_id: hir::DefinitionId, f: &hir::
             Ast::ReinterpretCast(cast)
         },
         Ast::Builtin(builtin) => Ast::Builtin(replace_env_builtin(builtin, env, definition_id, f)),
+        Ast::Borrow(mut borrow) => {
+            *borrow.rhs = replace_env(*borrow.rhs, env, definition_id, f);
+            Ast::Borrow(borrow)
+        },
     }
 }
 

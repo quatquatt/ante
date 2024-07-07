@@ -328,3 +328,25 @@ impl FmtAst for DecisionTree {
         }
     }
 }
+
+impl FmtAst for Borrow {
+    fn fmt_ast(&self, printer: &mut AstPrinter, f: &mut Formatter) -> fmt::Result {
+        if self.mutability == Mutability::Immutable && self.sharedness == Sharedness::Polymorphic {
+            write!(f, "&")?;
+            self.rhs.fmt_ast(printer, f)
+        } else {
+            write!(f, "(&{}", self.sharedness)?;
+
+            if self.sharedness != Sharedness::Polymorphic {
+                write!(f, " ")?;
+            }
+
+            if self.mutability != Mutability::Immutable {
+                write!(f, "mut ")?;
+            }
+
+            self.rhs.fmt_ast(printer, f)?;
+            write!(f, ")")
+        }
+    }
+}

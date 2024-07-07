@@ -126,6 +126,7 @@ impl<'c> Context<'c> {
             EffectDefinition(_) => todo!(),
             Handle(_) => todo!(),
             NamedConstructor(constructor) => self.monomorphise_named_constructor(constructor),
+            Borrow(borrow) => self.monomorphise_borrow(borrow),
         }
     }
 
@@ -1463,9 +1464,11 @@ impl<'c> Context<'c> {
             ast::Ast::Lambda(_) => unit_literal(),
             _ => {
                 let mut expr = self.monomorphise(&definition.expr);
-                if definition.mutable {
-                    expr = hir::Ast::Builtin(hir::Builtin::StackAlloc(Box::new(expr)));
-                }
+
+                // TODO: With the change to borrowing, all variables are mutable by default currently
+                // if definition.mutable {
+                expr = hir::Ast::Builtin(hir::Builtin::StackAlloc(Box::new(expr)));
+                // }
 
                 let name = Self::try_get_pattern_name(definition.pattern.as_ref());
                 let (new_definition, id) = self.fresh_definition(expr, name);
@@ -1591,6 +1594,14 @@ impl<'c> Context<'c> {
             ast::Ast::Sequence(sequence) => self.monomorphise_sequence(sequence),
             _ => unreachable!(),
         }
+    }
+
+    fn monomorphise_borrow(&mut self, borrow: &ast::Borrow<'c>) -> hir::Ast {
+        hir::Ast::Borrow(hir::Borrow {
+            mutability: borrow.mutability,
+            sharedness: borrow.sharedness,
+            rhs: Box::new(self.monomorphise(&borrow.rhs)),
+        })
     }
 
     pub fn extract(ast: hir::Ast, member_index: u32, result_type: Type) -> hir::Ast {

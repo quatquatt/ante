@@ -31,7 +31,7 @@ use inkwell::passes::PassManager;
 use inkwell::targets::{CodeModel, FileType, RelocMode, TargetTriple};
 use inkwell::targets::{InitializationConfig, Target, TargetMachine};
 use inkwell::types::{BasicType, BasicTypeEnum, FunctionType};
-use inkwell::values::{AggregateValue, BasicValue, BasicValueEnum, FunctionValue, InstructionOpcode};
+use inkwell::values::{AggregateValue, BasicValue, BasicValueEnum, FunctionValue, InstructionOpcode, PointerValue};
 use inkwell::AddressSpace;
 use inkwell::OptimizationLevel;
 
@@ -466,6 +466,18 @@ impl<'g> Generator<'g> {
         let field_type = self.convert_type(field_type);
         self.builder.build_load(field_type, gep, field_name).expect("Error creating load")
     }
+
+    fn codegen_reference(&mut self, ast: &impl CodeGen<'g>) -> PointerValue<'g> {
+        let value = ast.codegen(self);
+
+        match value.as_instruction_value() {
+            Some(instruction) if instruction.get_opcode() == InstructionOpcode::Load => {
+                instruction.get_operand(0).unwrap().left().unwrap().into_pointer_value()
+            },
+            // TODO: This can result in silent failures. Need better mutability semantics.
+            _ => value.into_pointer_value(),
+        }
+    }
 }
 
 trait CodeGen<'g> {
@@ -553,11 +565,11 @@ impl<'g> CodeGen<'g> for hir::FunctionCall {
 }
 
 fn should_auto_deref(definition: &hir::Definition) -> bool {
-    if let hir::Ast::Extern(ext) = definition.expr.as_ref() {
-        return !matches!(&ext.typ, hir::Type::Function(_));
+    match definition.expr.as_ref() {
+        hir::Ast::Extern(ext) => !matches!(&ext.typ, hir::Type::Function(_)),
+        hir::Ast::Builtin(hir::Builtin::StackAlloc(..)) => true,
+        _ => false,
     }
-
-    false
 }
 
 impl<'g> CodeGen<'g> for hir::Definition {
@@ -693,16 +705,7 @@ impl<'g> CodeGen<'g> for hir::MemberAccess {
 
 impl<'g> CodeGen<'g> for hir::Assignment {
     fn codegen(&self, generator: &mut Generator<'g>) -> BasicValueEnum<'g> {
-        let lhs = self.lhs.codegen(generator);
-
-        let lhs = match lhs.as_instruction_value() {
-            Some(instruction) if instruction.get_opcode() == InstructionOpcode::Load => {
-                instruction.get_operand(0).unwrap().left().unwrap().into_pointer_value()
-            },
-            // TODO: This can result in silent failures. Need better mutability semantics.
-            _ => lhs.into_pointer_value(),
-        };
-
+        let lhs = generator.codegen_reference(self.lhs.as_ref());
         let rhs = self.rhs.codegen(generator);
 
         let rhs_ptr = generator.context.ptr_type(AddressSpace::default());
@@ -742,5 +745,11 @@ impl<'g> CodeGen<'g> for hir::ReinterpretCast {
 impl<'g> CodeGen<'g> for hir::Builtin {
     fn codegen(&self, generator: &mut Generator<'g>) -> BasicValueEnum<'g> {
         builtin::call_builtin(self, generator)
+    }
+}
+
+impl<'g> CodeGen<'g> for hir::Borrow {
+    fn codegen(&self, generator: &mut Generator<'g>) -> BasicValueEnum<'g> {
+        generator.codegen_reference(self.rhs.as_ref()).into()
     }
 }

@@ -2084,3 +2084,15 @@ impl<'a> Inferable<'a> for ast::NamedConstructor<'a> {
         self.sequence.infer_impl(cache)
     }
 }
+
+impl<'a> Inferable<'a> for ast::Borrow<'a> {
+    fn infer_impl(&mut self, cache: &mut ModuleCache<'a>) -> TypeResult {
+        // TODO: Currently all values/variables are mutable.
+        let mut result = infer(self.rhs.as_mut(), cache);
+
+        let lifetime = next_type_variable_id(cache);
+        let ref_type = Type::Ref(self.sharedness, self.mutability, lifetime);
+        result.typ = Type::TypeApplication(Box::new(ref_type), vec![result.typ]);
+        result
+    }
+}

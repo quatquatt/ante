@@ -1726,3 +1726,11 @@ impl<'c> Resolvable<'c> for ast::NamedConstructor<'c> {
         resolver.pop_scope(cache, false, None);
     }
 }
+
+impl<'c> Resolvable<'c> for ast::Borrow<'c> {
+    fn declare(&mut self, _resolver: &mut NameResolver, _cache: &mut ModuleCache<'c>) {}
+
+    fn define(&mut self, resolver: &mut NameResolver, cache: &mut ModuleCache<'c>) {
+        self.rhs.define(resolver, cache);
+    }
+}

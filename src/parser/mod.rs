@@ -445,9 +445,24 @@ fn term<'a, 'b>(input: Input<'a, 'b>) -> AstResult<'a, 'b> {
         Token::Loop => loop_expr(input),
         Token::Match => match_expr(input),
         Token::Handle => handle_expr(input),
+        Token::Ampersand => borrow_expr(input),
         _ => or(&[type_annotation, named_constructor_expr, function_call, function_argument], "term")(input),
     }
 }
+
+parser!(borrow_expr loc =
+    _ <- expect(Token::Ampersand);
+    sharedness <- sharedness;
+    mutable <- maybe(expect(Token::Mut));
+    rhs <- term;
+    Ast::borrow(mutable.is_some(), sharedness, rhs, loc)
+);
+
+parser!(immutable_borrow_expr loc =
+    _ <- expect(Token::Ampersand);
+    rhs <- function_argument;
+    Ast::borrow(false, Sharedness::Polymorphic, rhs, loc)
+);
 
 parser!(function_call loc =
     function <- member_access;
@@ -569,12 +584,6 @@ parser!(not_expr loc =
     Ast::function_call(Ast::operator(not, loc), vec![expr], loc)
 );
 
-parser!(ref_expr loc =
-    token <- expect(Token::Ampersand);
-    expr !<- term;
-    Ast::function_call(Ast::operator(token, loc), vec![expr], loc)
-);
-
 parser!(at_expr loc =
     token <- expect(Token::At);
     expr !<- term;
@@ -644,7 +653,7 @@ parser!(else_expr _loc =
 fn function_argument<'a, 'b>(input: Input<'a, 'b>) -> AstResult<'a, 'b> {
     match input[0].0 {
         Token::Not => not_expr(input),
-        Token::Ampersand => ref_expr(input),
+        Token::Ampersand => immutable_borrow_expr(input),
         Token::At => at_expr(input),
         _ => member_access(input),
     }
@@ -652,7 +661,7 @@ fn function_argument<'a, 'b>(input: Input<'a, 'b>) -> AstResult<'a, 'b> {
 
 fn pattern_function_argument<'a, 'b>(input: Input<'a, 'b>) -> AstResult<'a, 'b> {
     match input[0].0 {
-        Token::Ampersand => ref_expr(input),
+        Token::Ampersand => immutable_borrow_expr(input),
         Token::At => at_expr(input),
         _ => pattern_argument(input),
     }

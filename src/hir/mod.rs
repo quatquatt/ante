@@ -203,6 +203,13 @@ pub struct ReinterpretCast {
 }
 
 #[derive(Debug, Clone)]
+pub struct Borrow {
+    pub mutability: Mutability,
+    pub sharedness: Sharedness,
+    pub rhs: Box<Ast>,
+}
+
+#[derive(Debug, Clone)]
 pub enum Builtin {
     AddInt(Box<Ast>, Box<Ast>),
     AddFloat(Box<Ast>, Box<Ast>),
@@ -270,6 +277,7 @@ pub enum Ast {
     MemberAccess(MemberAccess),
     Tuple(Tuple),
     ReinterpretCast(ReinterpretCast),
+    Borrow(Borrow),
     Builtin(Builtin),
 }
 
@@ -296,6 +304,7 @@ macro_rules! dispatch_on_hir {
             $crate::hir::Ast::MemberAccess(inner) =>    $function(inner $(, $($args),* )? ),
             $crate::hir::Ast::Tuple(inner) =>           $function(inner $(, $($args),* )? ),
             $crate::hir::Ast::ReinterpretCast(inner) => $function(inner $(, $($args),* )? ),
+            $crate::hir::Ast::Borrow(inner) =>          $function(inner $(, $($args),* )? ),
             $crate::hir::Ast::Builtin(inner) =>         $function(inner $(, $($args),* )? ),
         }
     });
@@ -303,7 +312,7 @@ macro_rules! dispatch_on_hir {
 
 pub(crate) use dispatch_on_hir;
 
-use crate::lexer::token::FloatKind;
+use crate::{lexer::token::FloatKind, parser::ast::{Mutability, Sharedness}};
 
 // Rust won't let us impl<T: FmtAst> Display for T
 macro_rules! impl_display {
@@ -331,4 +340,5 @@ impl_display!(Assignment);
 impl_display!(MemberAccess);
 impl_display!(Tuple);
 impl_display!(ReinterpretCast);
+impl_display!(Borrow);
 impl_display!(Builtin);

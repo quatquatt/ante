@@ -3,6 +3,7 @@ use cranelift::prelude::types::I8;
 use cranelift::prelude::{FloatCC, InstBuilder, IntCC, StackSlotData, StackSlotKind, Value as CraneliftValue};
 
 use crate::hir::{Ast, Builtin};
+use crate::util::fmap;
 
 use super::context::{int_pointer_type, pointer_type};
 use super::{CodeGen, Context, Value};
@@ -57,7 +58,7 @@ pub fn call_builtin<'ast>(builtin: &'ast Builtin, context: &mut Context<'ast>, b
         Builtin::Deref(a, typ) => return deref(context, typ, a, builder),
         Builtin::Offset(a, b, elem_size) => offset(value(a), value(b), elem_size, builder),
         Builtin::Transmute(a, typ) => return transmute(context, a, typ, builder),
-        Builtin::StackAlloc(a) => stack_alloc(a, context, builder),
+        Builtin::StackAlloc(a) => return stack_alloc(a, context, builder),
     };
 
     Value::Normal(result)
@@ -255,7 +256,7 @@ fn deref<'a>(context: &mut Context<'a>, typ: &crate::hir::Type, addr: &'a Ast, b
     context.load_value(typ, addr, &mut 0, builder)
 }
 
-fn stack_alloc<'a>(param1: &'a Ast, context: &mut Context<'a>, builder: &mut FunctionBuilder) -> CraneliftValue {
+fn stack_alloc<'a>(param1: &'a Ast, context: &mut Context<'a>, builder: &mut FunctionBuilder) -> Value {
     let values = param1.eval_all(context, builder);
 
     let size = values.iter().map(|value| builder.func.dfg.value_type(*value).bytes()).sum();
@@ -264,10 +265,13 @@ fn stack_alloc<'a>(param1: &'a Ast, context: &mut Context<'a>, builder: &mut Fun
     let slot = builder.create_stack_slot(data);
 
     let mut offset: u32 = 0;
-    for value in values {
+    let types = fmap(values, |value| {
         builder.ins().stack_store(value, slot, offset as i32);
-        offset += builder.func.dfg.value_type(value).bytes();
-    }
+        let typ = builder.func.dfg.value_type(value);
+        offset += typ.bytes();
+        typ
+    });
 
-    builder.ins().stack_addr(pointer_type(), slot, 0)
+    let value = builder.ins().stack_addr(pointer_type(), slot, 0);
+    Value::Loadable(value, types)
 }

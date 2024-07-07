@@ -1,0 +1,13 @@
+// All values are mutable by default currently.
+// This will change in the future
+a = 1
+mutate (&mut a)
+
+b = 2
+mutate &b
+
+print a
+print b
+
+mutate (x: &mut I32) =
+    x := 0

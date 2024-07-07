@@ -440,6 +440,16 @@ pub struct NamedConstructor<'a> {
     pub typ: Option<types::Type>,
 }
 
+/// `&rhs` or `&mut rhs`
+#[derive(Debug, Clone)]
+pub struct Borrow<'a> {
+    pub mutability: Mutability,
+    pub sharedness: Sharedness,
+    pub rhs: Box<Ast<'a>>,
+    pub location: Location<'a>,
+    pub typ: Option<types::Type>,
+}
+
 #[derive(Debug, Clone)]
 pub enum Ast<'a> {
     Literal(Literal<'a>),
@@ -462,6 +472,7 @@ pub enum Ast<'a> {
     EffectDefinition(EffectDefinition<'a>),
     Handle(Handle<'a>),
     NamedConstructor(NamedConstructor<'a>),
+    Borrow(Borrow<'a>),
 }
 
 unsafe impl<'c> Send for Ast<'c> {}
@@ -752,6 +763,16 @@ impl<'a> Ast<'a> {
         })
     }
 
+    pub fn borrow(mutable: bool, sharedness: Sharedness, rhs: Ast<'a>, location: Location<'a>) -> Ast<'a> {
+        Ast::Borrow(Borrow {
+            mutability: if mutable { Mutability::Mutable } else { Mutability::Immutable },
+            sharedness,
+            rhs: Box::new(rhs),
+            location,
+            typ: None,
+        })
+    }
+
     /// This is a bit of a hack.
     /// Create a new 'scope' by wrapping body in `match () | () -> body`
     pub fn new_scope(body: Ast<'a>, location: Location<'a>) -> Ast<'a> {
@@ -785,6 +806,7 @@ macro_rules! dispatch_on_expr {
             $crate::parser::ast::Ast::EffectDefinition(inner) => $function(inner $(, $($args),* )? ),
             $crate::parser::ast::Ast::Handle(inner) =>           $function(inner $(, $($args),* )? ),
             $crate::parser::ast::Ast::NamedConstructor(inner) => $function(inner $(, $($args),* )? ),
+            $crate::parser::ast::Ast::Borrow(inner) =>           $function(inner $(, $($args),* )? ),
         }
     });
 }
@@ -825,6 +847,7 @@ impl_locatable_for!(Assignment);
 impl_locatable_for!(EffectDefinition);
 impl_locatable_for!(Handle);
 impl_locatable_for!(NamedConstructor);
+impl_locatable_for!(Borrow);
 
 impl<'a> Locatable<'a> for Type<'a> {
     fn locate(&self) -> Location<'a> {
