@@ -11,3 +11,7 @@ print b
 
 mutate (x: &mut I32) =
     x := 0
+
+// expected stdout:
+// 0
+// 0

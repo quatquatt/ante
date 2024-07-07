@@ -1,11 +1,11 @@
 import StringBuilder
 
-sb: &mut StringBuilder = mut empty ()
-reserve sb 10
-append sb "你好，"
-append sb " World!"
+sb = mut empty ()
+reserve (&mut sb) 10
+append (&mut sb) "你好，"
+append (&mut sb) " World!"
 
-print (to_string @sb)
+print (to_string sb)
 
 // args: --delete-binary
 // expected stdout: 你好， World!

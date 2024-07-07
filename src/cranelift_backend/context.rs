@@ -68,7 +68,7 @@ pub enum Value {
 
     /// A loadable is a pointer value that should be loaded before it is used.
     /// Mutable definitions usually translate to these.
-    Loadable(CraneliftValue, Vec<cranelift_types::Type>),
+    Loadable(CraneliftValue, Vec<(/*offset:*/i32, cranelift_types::Type)>),
 
     /// Lazily inserting unit values helps prevent cluttering the IR with too many
     /// unit literals.
@@ -91,11 +91,8 @@ impl Value {
                 result
             },
             Value::Loadable(ptr, types) => {
-                let mut offset = 0;
-                fmap(types, |typ| {
-                    let value = builder.ins().load(typ, MemFlags::new(), ptr, offset as i32);
-                    offset += typ.bytes();
-                    value
+                fmap(types, |(offset, typ)| {
+                    builder.ins().load(typ, MemFlags::new(), ptr, offset)
                 })
             }
             other => vec![other.eval_single(context, builder)],
@@ -108,7 +105,7 @@ impl Value {
             Value::Normal(value) => value,
             Value::Loadable(ptr, types) => {
                 assert_eq!(types.len(), 1, "eval_single called on a tuple value");
-                builder.ins().load(types[0], MemFlags::new(), ptr, 0)
+                builder.ins().load(types[0].1, MemFlags::new(), ptr, 0)
             }
             Value::Unit => {
                 let unit_type = cranelift_types::I8;
@@ -289,7 +286,7 @@ impl<'local> Context<'local> {
             Value::Normal(value) => FunctionValue::Indirect(value),
             Value::Loadable(ptr, types) => {
                 assert_eq!(types.len(), 1, "codegen_function_use called on tuple value");
-                let value = builder.ins().load(types[0], MemFlags::new(), ptr, 0);
+                let value = builder.ins().load(types[0].1, MemFlags::new(), ptr, 0);
                 FunctionValue::Indirect(value)
             },
             Value::Global(_) => {

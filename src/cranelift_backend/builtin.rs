@@ -264,12 +264,12 @@ fn stack_alloc<'a>(param1: &'a Ast, context: &mut Context<'a>, builder: &mut Fun
     let data = StackSlotData::new(StackSlotKind::ExplicitSlot, size);
     let slot = builder.create_stack_slot(data);
 
-    let mut offset: u32 = 0;
+    let mut offset: i32 = 0;
     let types = fmap(values, |value| {
-        builder.ins().stack_store(value, slot, offset as i32);
+        builder.ins().stack_store(value, slot, offset);
         let typ = builder.func.dfg.value_type(value);
-        offset += typ.bytes();
-        typ
+        offset += typ.bytes() as i32;
+        (offset, typ)
     });
 
     let value = builder.ins().stack_addr(pointer_type(), slot, 0);

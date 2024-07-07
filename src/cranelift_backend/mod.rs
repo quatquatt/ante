@@ -200,6 +200,13 @@ impl CodeGen for hir::MemberAccess {
 
         match lhs {
             Value::Tuple(mut values) => values.swap_remove(index),
+            Value::Loadable(address, mut element_types) => {
+                let (offset, element_type) = element_types.swap_remove(index);
+                let address_type = builder.func.dfg.value_type(address);
+                let offset = builder.ins().iconst(address_type, offset as i64);
+                let new_address = builder.ins().iadd(address, offset);
+                Value::Loadable(new_address, vec![(0, element_type)])
+            }
             other => unreachable!("MemberAccess with non-tuple value: {:?}", other),
         }
     }
@@ -237,19 +244,7 @@ impl CodeGen for hir::Builtin {
 impl CodeGen for hir::Borrow {
     fn codegen<'a>(&'a self, context: &mut Context<'a>, builder: &mut FunctionBuilder) -> Value {
         match self.rhs.codegen(context, builder) {
-            Value::Loadable(address, types) => {
-                if types.len() == 1 {
-                    Value::Normal(address)
-                } else {
-                    let mut offset = 0;
-                    let address_type = builder.func.dfg.value_type(address);
-                    Value::Tuple(fmap(types, |typ| {
-                        let offset_value = builder.ins().iconst(address_type, offset as i64);
-                        offset += typ.bytes();
-                        Value::Normal(builder.ins().iadd(address, offset_value))
-                    }))
-                }
-            },
+            Value::Loadable(address, _) => Value::Normal(address),
             other => other,
         }
     }

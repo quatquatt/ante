@@ -241,7 +241,7 @@ impl Display for Sharedness {
 impl Display for Mutability {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Mutability::Polymorphic => write!(f, "mut?"),
+            Mutability::Polymorphic => Ok(()),
             Mutability::Immutable => Ok(()),
             Mutability::Mutable => write!(f, "mut"),
         }

@@ -1688,13 +1688,7 @@ impl<'a> Inferable<'a> for ast::Definition<'a> {
         let previous_level = CURRENT_LEVEL.swap(level.0, Ordering::SeqCst);
 
         // t, traits
-        let mut result = infer(self.expr.as_mut(), cache);
-        if self.mutable {
-            let lifetime = next_type_variable_id(cache);
-            let shared = Sharedness::Polymorphic;
-            let mutability = Mutability::Mutable;
-            result.typ = Type::TypeApplication(Box::new(Type::Ref(shared, mutability, lifetime)), vec![result.typ]);
-        }
+        let result = infer(self.expr.as_mut(), cache);
 
         // The rhs of a Definition must be inferred at a greater LetBindingLevel than
         // the lhs below. Here we use level for the rhs and level - 1 for the lhs
